@@ -1,0 +1,4 @@
+# requirements.txt
+
+google-adk
+google-genai
