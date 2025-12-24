@@ -7,40 +7,39 @@ from google.adk.events import Event, EventActions
 
 
 class TopicPresenceGuard(BaseAgent):
-    """Escalates only when a topic is present in the session state."""
+    name: str = "topic_presence_guard"
+    description: str = "Guard that escalates only when a topic is present in session state."
 
     async def _run_async_impl(
-        self, context: InvocationContext
+        self, ctx: InvocationContext
     ) -> AsyncGenerator[Event, None]:
         topic_keys = ("normalized_topic", "raw_topic")
-        has_topic = any(context.session.state.get(key) for key in topic_keys)
-        if has_topic:
-            yield Event(author=self.name, actions=EventActions(escalate=True))
-        else:
-            yield Event(author=self.name)
+        has_topic = any(ctx.session.state.get(key) for key in topic_keys)
+        yield Event(
+            author=self.name,
+            actions=EventActions(escalate=bool(has_topic)),
+        )
 
 
 class MarkdownReportGuard(BaseAgent):
-    """Escalates only when a final markdown report exists in the session state."""
+    name: str = "markdown_report_guard"
+    description: str = "Guard that escalates only when final_markdown exists in session state."
 
     async def _run_async_impl(
-        self, context: InvocationContext
+        self, ctx: InvocationContext
     ) -> AsyncGenerator[Event, None]:
-        if context.session.state.get("final_markdown"):
-            yield Event(author=self.name, actions=EventActions(escalate=True))
-        else:
-            yield Event(author=self.name)
+        has_markdown = bool(ctx.session.state.get("final_markdown"))
+        yield Event(
+            author=self.name,
+            actions=EventActions(escalate=has_markdown),
+        )
 
 
-async def track_agent_start(callback_context: CallbackContext) -> None:
-    """Stores the name of the agent that just started in the session state."""
-
-    invocation = callback_context.invocation_context
-    invocation.session.state["last_agent_started"] = invocation.agent.name
+async def track_agent_start(callback_context: CallbackContext):
+    callback_context.state["last_agent_started"] = callback_context.agent_name
+    return None
 
 
-async def track_agent_end(callback_context: CallbackContext) -> None:
-    """Stores the name of the agent that just finished in the session state."""
-
-    invocation = callback_context.invocation_context
-    invocation.session.state["last_agent_finished"] = invocation.agent.name
+async def track_agent_end(callback_context: CallbackContext):
+    callback_context.state["last_agent_finished"] = callback_context.agent_name
+    return None

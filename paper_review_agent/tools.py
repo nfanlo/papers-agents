@@ -1,40 +1,42 @@
 import os
 import re
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
+
+from google.adk.tools import FunctionTool
 
 from .config import config
 
 
 def _slugify(text: str) -> str:
-    normalized = re.sub(r"[^a-zA-Z0-9]+", "-", text.lower()).strip("-")
-    return normalized or "paper-review"
+    text = text.strip().lower()
+    text = re.sub(r"[^a-z0-9]+", "-", text)
+    text = re.sub(r"-{2,}", "-", text)
+    return text.strip("-") or "report"
 
 
-def build_markdown_filename(topic: str, timestamp: Optional[datetime] = None) -> str:
-    safe_topic = _slugify(topic)
-    ts = timestamp or datetime.utcnow()
-    suffix = ts.strftime("%Y%m%d-%H%M%S")
-    return f"{suffix}-{safe_topic}.md"
+def save_markdown_report(topic: str, markdown_content: str) -> Dict[str, str]:
+    os.makedirs(config.output_directory, exist_ok=True)
+    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    slug = _slugify(topic)
+    filename = f"{timestamp}-{slug}.md"
+    path = os.path.join(config.output_directory, filename)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(markdown_content)
+    return {"filename": filename, "path": path}
 
 
-def save_markdown_report(topic: str, markdown_content: str, directory: Optional[str] = None) -> Dict[str, str]:
-    base_directory = directory or config.output_directory
-    os.makedirs(base_directory, exist_ok=True)
-    filename = build_markdown_filename(topic)
-    path = os.path.join(base_directory, filename)
-    with open(path, "w", encoding="utf-8") as file:
-        file.write(markdown_content)
-    return {"path": path, "filename": filename}
-
-
-def list_existing_reports(directory: Optional[str] = None) -> Dict[str, List[str]]:
-    base_directory = directory or config.output_directory
-    if not os.path.isdir(base_directory):
-        return {"files": []}
+def list_existing_reports() -> List[str]:
+    if not os.path.isdir(config.output_directory):
+        return []
     entries = [
-        entry
-        for entry in os.listdir(base_directory)
-        if os.path.isfile(os.path.join(base_directory, entry))
+        name
+        for name in os.listdir(config.output_directory)
+        if name.endswith(".md")
     ]
-    return {"files": sorted(entries)}
+    entries.sort()
+    return entries
+
+
+save_markdown_report_tool = FunctionTool(func=save_markdown_report)
+list_existing_reports_tool = FunctionTool(func=list_existing_reports)
